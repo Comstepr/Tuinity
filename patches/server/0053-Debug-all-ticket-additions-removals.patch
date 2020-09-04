@@ -1,0 +1,88 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Spottedleaf <spottedleaf@spottedleaf.dev>
+Date: Thu, 3 Sep 2020 22:47:09 -0700
+Subject: [PATCH] Debug all ticket additions/removals
+
+In the efforts of figuring out the issues with delay unload
+
+diff --git a/src/main/java/net/minecraft/server/ArraySetSorted.java b/src/main/java/net/minecraft/server/ArraySetSorted.java
+index 7db6b5850b91588eb4d91f0d7e8b5dbbcb95b7cb..373e570ad8836e2121c33475b1966844f4769120 100644
+--- a/src/main/java/net/minecraft/server/ArraySetSorted.java
++++ b/src/main/java/net/minecraft/server/ArraySetSorted.java
+@@ -43,12 +43,14 @@ public class ArraySetSorted<T> extends AbstractSet<T> {
+         // we only want to write back to backingArray if we really need to
+ 
+         int lastIndex = i; // this is where new elements are shifted to
++        boolean first = true;
+ 
+         for (; i < len; ++i) {
+             T curr = backingArray[i];
+-            if (!filter.test(curr)) { // if test throws we're screwed
++            if (!first && !filter.test(curr)) { // if test throws we're screwed
+                 backingArray[lastIndex++] = curr;
+             }
++            first = false;
+         }
+ 
+         // cleanup end
+diff --git a/src/main/java/net/minecraft/server/ChunkMapDistance.java b/src/main/java/net/minecraft/server/ChunkMapDistance.java
+index 1b750da9e09fa2c9e16db63dff165336ce12e087..8f09b19fc94e94be0b6583a8881334365b766ac6 100644
+--- a/src/main/java/net/minecraft/server/ChunkMapDistance.java
++++ b/src/main/java/net/minecraft/server/ChunkMapDistance.java
+@@ -43,6 +43,10 @@ public abstract class ChunkMapDistance {
+             return super.add(o);
+         }
+     };
++    private static final java.util.concurrent.atomic.AtomicLong SEQ = new java.util.concurrent.atomic.AtomicLong();
++    private String getSeq() {
++        return "[ChunkMapDistance on world '" + this.chunkMap.world.getWorld().getName() + "' seq id:#" + SEQ.getAndIncrement() + "] ";
++    }
+     // Paper end
+     private final ChunkTaskQueueSorter i;
+     private final Mailbox<ChunkTaskQueueSorter.a<Runnable>> j;
+@@ -126,11 +130,21 @@ public abstract class ChunkMapDistance {
+                 if (ticket.getTicketType() == TicketType.DELAYED_UNLOAD && ticket.isCached) {
+                     this.delayedChunks.remove(entry.getLongKey(), ticket); // clean up ticket...
+                 }
++                if (ret) {
++                    if (ticket.isCached) {
++                        MinecraftServer.LOGGER.info(this.getSeq() + "Removing expired delayed unload ticket '" + ticket + "' at chunk '" + new ChunkCoordIntPair(entry.getLongKey()).toString() + "' on real tick '" + MinecraftServer.currentTick + "' on distance manager tick '" + this.currentTick + "'");
++                    } else {
++                        MinecraftServer.LOGGER.info(this.getSeq() + "Removing expired ticket '" + ticket + "' at chunk '" + new ChunkCoordIntPair(entry.getLongKey()).toString() + "' on real tick '" + MinecraftServer.currentTick + "' on distance manager tick '" + this.currentTick + "'");
++                    }
++                }
+                 return ret;
+                 // Tuinity end - delay chunk unloads
+             })) {
+                 // Tuinity start - delay chunk unloads
+                 if (tempLevel[0] < (PlayerChunkMap.GOLDEN_TICKET + 1)) {
++                    if (tempLevel[0] <= getLowestTicketLevel(entry.getValue())) {
++                        MinecraftServer.LOGGER.info(this.getSeq() + "Computing delayed unload ticket due to expiration for level '" + tempLevel[0] + "' at chunk '" + new ChunkCoordIntPair(entry.getLongKey()).toString() + "' on real tick '" + MinecraftServer.currentTick + "' on distance manager tick '" + this.currentTick + "'");
++                    }
+                     this.computeDelayedTicketFor(entry.getLongKey(), tempLevel[0], entry.getValue());
+                 }
+                 // Tuinity end - delay chunk unloads
+@@ -220,6 +234,9 @@ public abstract class ChunkMapDistance {
+         ArraySetSorted<Ticket<?>> arraysetsorted = this.e(i);
+         int j = getLowestTicketLevel(arraysetsorted);
+         Ticket<?> ticket1 = (Ticket) arraysetsorted.a(ticket); // CraftBukkit - decompile error
++        if (ticket1 != ticket) {
++            MinecraftServer.LOGGER.info(this.getSeq() + "Added ticket '" + ticket + "' at chunk '" + new ChunkCoordIntPair(i).toString() + "' on real tick '" + MinecraftServer.currentTick + "' on distance manager tick '" + this.currentTick + "'");
++        }
+ 
+         ticket1.a(this.currentTick);
+         if (ticket.b() < j) {
+@@ -236,9 +253,13 @@ public abstract class ChunkMapDistance {
+ 
+         boolean removed = false; // CraftBukkit
+         if (arraysetsorted.remove(ticket)) {
++            MinecraftServer.LOGGER.info(this.getSeq() + "Removed ticket '" + ticket + "' at chunk '" + new ChunkCoordIntPair(i).toString() + "' on real tick '" + MinecraftServer.currentTick + "' on distance manager tick '" + this.currentTick + "'");
+             removed = true; // CraftBukkit
+             // Tuinity start - delay chunk unloads
+             if (com.tuinity.tuinity.config.TuinityConfig.delayChunkUnloadsBy > 0 && ticket.getTicketType().delayUnloadViable) {
++                if (ticket.getTicketLevel() <= getLowestTicketLevel(arraysetsorted)) {
++                    MinecraftServer.LOGGER.info(this.getSeq() + "Computing delayed unload ticket due to ticket removal of ticket '" + ticket + "' at chunk '" + new ChunkCoordIntPair(i).toString() + "' on real tick '" + MinecraftServer.currentTick + "' on distance manager tick '" + this.currentTick + "'");
++                }
+                 this.computeDelayedTicketFor(i, ticket.getTicketLevel(), arraysetsorted);
+             }
+             // Tuinity end - delay chunk unloads
