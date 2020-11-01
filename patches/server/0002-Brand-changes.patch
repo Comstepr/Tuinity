@@ -26,7 +26,7 @@ index 26bbfeba138f506200aad667b6f910b8fc0d2d6a..7e00824a467dac011863c4c16f728564
  
      public String getServerModName() {
 -        return "Paper"; //Paper - Paper > // Spigot - Spigot > // CraftBukkit - cb > vanilla!
-+        return "Tuinity"; // Tuinity //Paper - Paper > // Spigot - Spigot > // CraftBukkit - cb > vanilla!
++        return "ComsterCraft"; // Tuinity //Paper - Paper > // Spigot - Spigot > // CraftBukkit - cb > vanilla!
      }
  
      public CrashReport b(CrashReport crashreport) {
@@ -50,9 +50,8 @@ index 26c0ced8c2f1e22092c5d4405b9c6be8ac04cf24..5ec9dd031b1d30e14980b0fa1accb57d
 @@ -252,7 +252,7 @@ public class Main {
                      if (buildDate.before(deadline.getTime())) {
                          // Paper start - This is some stupid bullshit
-                         System.err.println("*** Warning, you've not updated in a while! ***");
+-                        System.err.println("*** Warning, you've not updated in a while! ***");
 -                        System.err.println("*** Please download a new build as per instructions from https://papermc.io/downloads ***"); // Paper
-+                        System.err.println("*** Please download a new build ***"); // Paper // Tuinity
                          //System.err.println("*** Server will start in 20 seconds ***");
                          //Thread.sleep(TimeUnit.SECONDS.toMillis(20));
                          // Paper End
